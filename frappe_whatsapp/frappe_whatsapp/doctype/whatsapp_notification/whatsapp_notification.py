@@ -212,9 +212,9 @@ class WhatsAppNotification(Document):
                 })
             self.content_type = template.header_type.lower()
 
-            self.notify(data, doc_data)
+            self.notify(data, doc_data, template.whatsapp_account)
 
-    def notify(self, data, doc_data=None):
+    def notify(self, data, doc_data=None, whatsapp_account):
         """Notify."""
         settings = frappe.get_doc(
             "WhatsApp Settings", "WhatsApp Settings",
@@ -243,6 +243,7 @@ class WhatsAppNotification(Document):
                 "message_type": "Template",
                 "message_id": response['messages'][0]['id'],
                 "content_type": self.content_type,
+                "whatsapp_account": whatsapp_account,
             }
 
             if doc_data:
