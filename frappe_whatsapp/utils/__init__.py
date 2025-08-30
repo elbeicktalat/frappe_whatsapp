@@ -14,7 +14,7 @@ def run_server_script_for_doc_event(doc, event):
 
     if frappe.flags.in_migrate:
         return
-    
+
     if frappe.flags.in_uninstall:
         return
 
@@ -121,6 +121,7 @@ def trigger_whatsapp_notifications(event):
             wa.name,
         ).send_scheduled_message()
 
+
 def get_whatsapp_account(phone_id=None, account_type='incoming'):
     """map whatsapp account with message"""
     if phone_id:
@@ -128,12 +129,13 @@ def get_whatsapp_account(phone_id=None, account_type='incoming'):
         if account_name:
             return frappe.get_doc("WhatsApp Account", account_name)
 
-    account_field_type = 'is_default_incoming' if account_type =='incoming' else 'is_default_outgoing' 
+    account_field_type = 'is_default_incoming' if account_type == 'incoming' else 'is_default_outgoing'
     default_account_name = frappe.db.get_value('WhatsApp Account', {account_field_type: 1}, 'name')
     if default_account_name:
         return frappe.get_doc("WhatsApp Account", default_account_name)
 
     return None
+
 
 def format_number(number):
     """Format number."""
