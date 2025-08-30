@@ -82,7 +82,7 @@ class WhatsAppNotification(Document):
                 }
             }
             self.content_type = template.get("header_type", "text").lower()
-            self.notify(data)
+            self.notify(data, template.whatsapp_account)
 
 
     def send_template_message(self, doc: Document, phone_no=None, default_template=None, ignore_condition=False):
@@ -212,9 +212,9 @@ class WhatsAppNotification(Document):
                 })
             self.content_type = template.header_type.lower()
 
-            self.notify(data, doc_data, template.whatsapp_account)
+            self.notify(data, template.whatsapp_account, doc_data)
 
-    def notify(self, data, doc_data=None, whatsapp_account):
+    def notify(self, data, whatsapp_account: str, doc_data=None):
         """Notify."""
         settings = frappe.get_doc(
             "WhatsApp Settings", "WhatsApp Settings",
