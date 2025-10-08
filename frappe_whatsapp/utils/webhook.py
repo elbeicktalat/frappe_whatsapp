@@ -101,6 +101,7 @@ def post():
 					"content_type": "flow",
 					"profile_name":sender_profile_name,
 					"whatsapp_account":whatsapp_account.name,
+                    "is_reply": 1,
                     "reply_to_message_id": reply_to_message_id,
 				}).insert(ignore_permissions=True)
 			elif message_type in ["image", "audio", "video", "document"]:
