@@ -32,137 +32,159 @@ def get():
 	return Response(hub_challenge, status=200)
 
 def post():
-    # Helper function to get data safely
-    data = frappe.form_dict
+	"""Post."""
+	data = frappe.local.form_dict
+	frappe.get_doc({
+		"doctype": "WhatsApp Notification Log",
+		"template": "Webhook",
+		"meta_data": json.dumps(data)
+	}).insert(ignore_permissions=True)
 
-    if frappe.request.method != "POST":
-        if frappe.form_dict.get("hub.mode") == "subscribe" and frappe.form_dict.get(
-                "hub.verify_token") == frappe.db.get_single_value("WhatsApp Settings", "webhook_verify_token"):
-            return frappe.form_dict.get("hub.challenge")
+	messages = []
+	phone_id = None
+	try:
+		messages = data["entry"][0]["changes"][0]["value"].get("messages", [])
+		phone_id = data.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {}).get("metadata", {}).get("phone_number_id")
+	except KeyError:
+		messages = data["entry"]["changes"][0]["value"].get("messages", [])
+	sender_profile_name = next(
+		(
+			contact.get("profile", {}).get("name")
+			for entry in data.get("entry", [])
+			for change in entry.get("changes", [])
+			for contact in change.get("value", {}).get("contacts", [])
+		),
+		None,
+	)
 
-        return "OK"
+	whatsapp_account = get_whatsapp_account(phone_id) if phone_id else None
+	if not whatsapp_account:
+		return
 
-    # Standard webhook processing to extract messages
-    try:
-        messages = data["entry"][0]["changes"][0]["value"].get("messages", [])
-        phone_id = data["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"]
-        contact = data["entry"][0]["changes"][0]["value"]["contacts"][0]
-        sender_wa_id = contact["wa_id"]
-        sender_profile_name = contact["profile"].get("name", sender_wa_id)
-    except Exception:
-        frappe.logger("whatsapp").exception("Error extracting data from webhook payload")
-        return "OK"
+	if messages:
+		for message in messages:
+			message_type = message['type']
+			is_reply = True if message.get('context') else False
+			reply_to_message_id = message['context']['id'] if is_reply else None
+			if message_type == 'text':
+				frappe.get_doc({
+					"doctype": "WhatsApp Message",
+					"type": "Incoming",
+					"from": message['from'],
+					"message": message['text']['body'],
+					"message_id": message['id'],
+					"reply_to_message_id": reply_to_message_id,
+					"is_reply": is_reply,
+					"content_type":message_type,
+					"profile_name":sender_profile_name,
+					"whatsapp_account":whatsapp_account.name
+				}).insert(ignore_permissions=True)
+			elif message_type == 'reaction':
+				frappe.get_doc({
+					"doctype": "WhatsApp Message",
+					"type": "Incoming",
+					"from": message['from'],
+					"message": message['reaction']['emoji'],
+					"reply_to_message_id": message['reaction']['message_id'],
+					"message_id": message['id'],
+					"content_type": "reaction",
+					"profile_name":sender_profile_name,
+					"whatsapp_account":whatsapp_account.name
+				}).insert(ignore_permissions=True)
+			elif message_type == 'interactive':
+				frappe.get_doc({
+					"doctype": "WhatsApp Message",
+					"type": "Incoming",
+					"from": message['from'],
+					"message": message['interactive']['button_reply']['title'],
+					"message_id": message['id'],
+					"content_type": "flow",
+					"profile_name":sender_profile_name,
+					"whatsapp_account":whatsapp_account.name
+				}).insert(ignore_permissions=True)
+			elif message_type in ["image", "audio", "video", "document"]:
+				token = whatsapp_account.get_password("token")
+				url = f"{whatsapp_account.url}/{whatsapp_account.version}/"
 
-    if not messages:
-        return "OK"
+				media_id = message[message_type]["id"]
+				headers = {
+					'Authorization': 'Bearer ' + token
 
-    try:
-        whatsapp_account = frappe.get_doc("WhatsApp Account", {"phone_number_id": phone_id})
-    except frappe.DoesNotExistError:
-        frappe.logger("whatsapp").error(f"WhatsApp Account not found for phone_number_id: {phone_id}")
-        return "OK"
+				}
+				response = requests.get(f'{url}{media_id}/', headers=headers)
 
-    for message in messages:
-        message_type = message.get("type")
-        reply_to_message_id = message.get("context", {}).get("id")
+				if response.status_code == 200:
+					media_data = response.json()
+					media_url = media_data.get("url")
+					mime_type = media_data.get("mime_type")
+					file_extension = mime_type.split('/')[1]
 
-        # Determine if it's a message reply (including interactive replies)
-        is_reply = bool(reply_to_message_id)
+					media_response = requests.get(media_url, headers=headers)
+					if media_response.status_code == 200:
 
-        # Base structure for the WhatsApp Message document
-        whatsapp_message_doc = frappe.new_doc("WhatsApp Message")
-        whatsapp_message_doc.sender_id = sender_wa_id
-        whatsapp_message_doc.from_number = sender_wa_id
-        whatsapp_message_doc.to = whatsapp_account.phone_number
-        whatsapp_message_doc.sender_name = sender_profile_name
-        whatsapp_message_doc.whatsapp_account = whatsapp_account.name
-        whatsapp_message_doc.message_timestamp = message.get("timestamp")
-        whatsapp_message_doc.message_id = message.get("id")
-        whatsapp_message_doc.type = message_type
+						file_data = media_response.content
+						file_name = f"{frappe.generate_hash(length=10)}.{file_extension}"
 
-        message_content = {}
+						message_doc = frappe.get_doc({
+							"doctype": "WhatsApp Message",
+							"type": "Incoming",
+							"from": message['from'],
+							"message_id": message['id'],
+							"reply_to_message_id": reply_to_message_id,
+							"is_reply": is_reply,
+							"message": message[message_type].get("caption",f"/files/{file_name}"),
+							"content_type" : message_type,
+							"profile_name":sender_profile_name,
+							"whatsapp_account":whatsapp_account.name
+						}).insert(ignore_permissions=True)
 
-        # --- FIX APPLIED HERE: Handle different interactive types ---
-        if message_type == "interactive":
-            interactive_data = message.get("interactive", {})
-            interactive_type = interactive_data.get("type")
+						file = frappe.get_doc(
+							{
+								"doctype": "File",
+								"file_name": file_name,
+								"attached_to_doctype": "WhatsApp Message",
+								"attached_to_name": message_doc.name,
+								"content": file_data,
+								"attached_to_field": "attach"
+							}
+						).save(ignore_permissions=True)
 
-            if interactive_type == "button_reply":
-                # This is the type you received. It contains 'button_reply'
-                button_reply = interactive_data.get("button_reply", {})
 
-                message_content = {
-                    "message_type": "button_reply",
-                    "message": f"Button Clicked: {button_reply.get('title')} (ID: {button_reply.get('id')})",
-                    "reply_to_message_id": reply_to_message_id,
-                    "reply_id": button_reply.get('id'),  # Store the button ID separately
-                    "content_type": "text"
-                }
+						message_doc.attach = file.file_url
+						message_doc.save()
+			elif message_type == "button":
+				frappe.get_doc({
+					"doctype": "WhatsApp Message",
+					"type": "Incoming",
+					"from": message['from'],
+					"message": message['button']['text'],
+					"message_id": message['id'],
+					"reply_to_message_id": reply_to_message_id,
+					"is_reply": is_reply,
+					"content_type": message_type,
+					"profile_name":sender_profile_name,
+					"whatsapp_account":whatsapp_account.name
+				}).insert(ignore_permissions=True)
+			else:
+				frappe.get_doc({
+					"doctype": "WhatsApp Message",
+					"type": "Incoming",
+					"from": message['from'],
+					"message_id": message['id'],
+					"message": message[message_type].get(message_type),
+					"content_type" : message_type,
+					"profile_name":sender_profile_name,
+					"whatsapp_account":whatsapp_account.name
+				}).insert(ignore_permissions=True)
 
-            elif interactive_type == "nfm_reply":
-                # Handle Native Flow Messages (Original logic)
-                nfm_reply = interactive_data.get("nfm_reply", {})
-
-                message_content = {
-                    "message_type": "interactive",
-                    "message": nfm_reply.get("response_json"),
-                    "reply_to_message_id": reply_to_message_id,
-                    "content_type": "text"
-                }
-
-            elif interactive_type == "list_reply":
-                # Handle List Messages (If applicable)
-                list_reply = interactive_data.get("list_reply", {})
-
-                message_content = {
-                    "message_type": "list_reply",
-                    "message": f"List Item Selected: {list_reply.get('title')} (ID: {list_reply.get('id')})",
-                    "reply_to_message_id": reply_to_message_id,
-                    "reply_id": list_reply.get('id'),
-                    "content_type": "text"
-                }
-
-            else:
-                frappe.logger("whatsapp").error(f"Unsupported interactive message type: {interactive_type}")
-                continue  # Skip processing this message
-
-        # --- Handle other standard message types (kept for completeness) ---
-        elif message_type == "text":
-            message_content = {
-                "message": message["text"]["body"],
-                "reply_to_message_id": reply_to_message_id,
-                "content_type": "text"
-            }
-
-        elif message_type == "image":
-            image_data = message["image"]
-            media_id = image_data.get("id")
-            caption = image_data.get("caption", "")
-
-            message_content = {
-                "message": caption,
-                "reply_to_message_id": reply_to_message_id,
-                "media_id": media_id,
-                "content_type": "image"
-            }
-
-        # Add logic for document, video, location, contacts, etc. here...
-
-        else:
-            # Handle unrecognized or unhandled message types
-            frappe.logger("whatsapp").info(f"Received unhandled message type: {message_type}")
-            continue
-
-        whatsapp_message_doc.update(message_content)
-
-        try:
-            whatsapp_message_doc.insert(ignore_permissions=True)
-            frappe.db.commit()
-        except Exception:
-            frappe.logger("whatsapp").exception("Error saving WhatsApp Message document")
-
-    return "OK"
-
+	else:
+		changes = None
+		try:
+			changes = data["entry"][0]["changes"][0]
+		except KeyError:
+			changes = data["entry"]["changes"][0]
+		update_status(changes)
+	return
 
 def update_status(data):
 	"""Update status hook."""
