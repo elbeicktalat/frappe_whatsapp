@@ -100,7 +100,8 @@ def post():
 					"message_id": message['id'],
 					"content_type": "flow",
 					"profile_name":sender_profile_name,
-					"whatsapp_account":whatsapp_account.name
+					"whatsapp_account":whatsapp_account.name,
+                    "reply_to_message_id": reply_to_message_id,
 				}).insert(ignore_permissions=True)
 			elif message_type in ["image", "audio", "video", "document"]:
 				token = whatsapp_account.get_password("token")
