@@ -217,7 +217,8 @@ def fetch():
 
     for account in whatsapp_accounts:
         # get credentials
-        token = frappe.get_password('WhatsApp Account', account.name, 'token')
+        settings = frappe.get_doc("WhatsApp Account", account.name)
+        token = settings.get_password("token")
         url = account.url
         version = account.version
         business_id = account.business_id
