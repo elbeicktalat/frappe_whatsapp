@@ -171,16 +171,9 @@ def handle_incoming_message(message, whatsapp_account, sender_profile_name):
 
     elif message_type == 'location':
         location_data = message['location']
-        # Store coordinates and address information in a structured or combined way
-        message_text = f"Lat: {location_data.get('latitude')}, Lon: {location_data.get('longitude')}"
-        if location_data.get('name'):
-            message_text += f", Name: {location_data['name']}"
-        if location_data.get('address'):
-            message_text += f", Address: {location_data['address']}"
-
         frappe.get_doc({
             **common_fields,
-            "message": message_text,
+            "message": json.dump(location_data),
             "content_type": message_type,
         }).insert(ignore_permissions=True)
 
