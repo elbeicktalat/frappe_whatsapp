@@ -284,7 +284,7 @@ def update_message_status(data):
         timestamp_s = int(timestamp_ms) / 1000
         dt = frappe.utils.get_datetime(timestamp_s)
     except (ValueError, TypeError) as e:
-        frappe.throw(f"Invalid timestamp format: {timestamp_ms} Getting error: {e}")
+        frappe.error_log(f"Invalid timestamp format: {timestamp_ms} Getting error: {e}")
         # Handle cases where timestamp is not a valid integer string or casting fails
         return
 
