@@ -262,17 +262,6 @@ def update_template_status(data):
         data
     )
 
-def timestamp_to_frappe_dt(timestamp):
-	# 1. Convert to Python datetime object
-	python_datetime_object = datetime.datetime.fromtimestamp(timestamp)
-
-	# 2. Format into Frappe-compatible datetime string
-	frappe_formatted_string = python_datetime_object.strftime("%Y-%m-%d %H:%M:%S")
-
-	# 3. (Optional) Convert to Frappe's internal datetime object
-	# This requires a Frappe context to import and use frappe.utils
-	frappe_datetime_obj = frappe.utils.get_datetime(frappe_formatted_string)
-	return frappe_datetime_obj
 
 def update_message_status(data):
     """Update message status."""
@@ -284,36 +273,11 @@ def update_message_status(data):
     id = status_info['id']
     status = status_info['status']
     conversation = status_info.get('conversation', {}).get('id')
-
-    # FIX: Retrieve timestamp and convert from milliseconds (WhatsApp default) to seconds (float)
-    timestamp_ms = status_info.get('timestamp')
-    if not timestamp_ms:
-        return  # Cannot update status without a timestamp
-
-    try:
-        # Convert millisecond timestamp (string) to seconds (float)
-        timestamp_s = int(timestamp_ms) / 1000
-        dt = timestamp_to_frappe_dt(timestamp_s)
-    except (ValueError, TypeError) as e:
-        frappe.error_log(f"Invalid timestamp format: {timestamp_ms} Getting error: {e}")
-        # Handle cases where timestamp is not a valid integer string or casting fails
-        return
-
     name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
     if name:
         doc = frappe.get_doc("WhatsApp Message", name)
         doc.status = status
-
-        # Update timestamp fields based on status
-        if status == 'delivered':
-            # This is where the message was delivered to the recipient's phone.
-            # Assuming DocType field is 'delivered_at' or 'received_at'
-            # Using delivered_at based on Meta's terminology
-            doc.delivered_at = dt
-        elif status == 'read':
-            # This is where the recipient read the message.
-            doc.read_at = dt
 
         if conversation:
             doc.conversation_id = conversation
