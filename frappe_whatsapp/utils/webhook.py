@@ -276,11 +276,24 @@ def update_message_status(data):
     id = status_info['id']
     status = status_info['status']
     conversation = status_info.get('conversation', {}).get('id')
+
+    # Extract timestamp (UNIX) and convert to Frappe datetime
+    timestamp_unix = int(status_info.get('timestamp'))
+    timestamp_dt = frappe.utils.get_datetime(timestamp_unix)
+
     name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
     if name:
         doc = frappe.get_doc("WhatsApp Message", name)
         doc.status = status
+
+        # Update timestamp fields based on status
+        if status == 'delivered':
+            # Note: WhatsApp uses 'delivered' for received by the user's phone.
+            doc.delivered_at = timestamp_dt
+        elif status == 'read':
+            doc.read_at = timestamp_dt
+
         if conversation:
             doc.conversation_id = conversation
         doc.save(ignore_permissions=True)
