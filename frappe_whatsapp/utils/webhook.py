@@ -266,6 +266,17 @@ def update_template_status(data):
         data
     )
 
+def convert_timestamp_to_frappe_dt(timestamp):
+	# 1. Convert to Python datetime object
+	python_datetime_object = datetime.datetime.fromtimestamp(timestamp)
+
+	# 2. Format into Frappe-compatible datetime string
+	frappe_formatted_string = python_datetime_object.strftime("%Y-%m-%d %H:%M:%S")
+
+	# 3. (Optional) Convert to Frappe's internal datetime object
+	# This requires a Frappe context to import and use frappe.utils
+	frappe_datetime_obj = frappe.utils.get_datetime(frappe_formatted_string)
+	return frappe_datetime_obj
 
 def update_message_status(data):
     """Update message status."""
@@ -277,18 +288,10 @@ def update_message_status(data):
     id = status_info['id']
     status = status_info['status']
     conversation = status_info.get('conversation', {}).get('id')
-
     timestamp = status_info.get('timestamp')
-
-    if timestamp:
-        # Convert to integer and divide by 1000
-        timestamp_dt = datetime.fromtimestamp(timestamp)
-        frappe_datetime_string = timestamp_dt.strftime("%Y-%m-%d %H:%M:%S")
-        frappe_datetime_object = frappe.utils.get_datetime(frappe_datetime_string)
-    else:
-        return  # Cannot update status without a timestamp
-
     name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
+
+    dt = convert_timestamp_to_frappe_dt(timestamp)
 
     if name:
         doc = frappe.get_doc("WhatsApp Message", name)
@@ -297,9 +300,9 @@ def update_message_status(data):
         # Update timestamp fields based on status
         if status == 'delivered':
             # Note: WhatsApp uses 'delivered' for received by the user's phone.
-            doc.delivered_at = frappe_datetime_object
+            doc.delivered_at = dt
         elif status == 'read':
-            doc.read_at = frappe_datetime_object
+            doc.read_at = dt
 
         if conversation:
             doc.conversation_id = conversation
