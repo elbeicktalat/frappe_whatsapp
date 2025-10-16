@@ -283,6 +283,7 @@ def update_message_status(data):
     if timestamp:
         # Convert to integer and divide by 1000
         timestamp_dt = datetime.fromtimestamp(timestamp)
+        frappe_datetime_string = timestamp_dt.strftime("%Y-%m-%d %H:%M:%S")
     else:
         return  # Cannot update status without a timestamp
 
@@ -295,9 +296,9 @@ def update_message_status(data):
         # Update timestamp fields based on status
         if status == 'delivered':
             # Note: WhatsApp uses 'delivered' for received by the user's phone.
-            doc.delivered_at = timestamp_dt
+            doc.delivered_at = frappe_datetime_string
         elif status == 'read':
-            doc.read_at = timestamp_dt
+            doc.read_at = frappe_datetime_string
 
         if conversation:
             doc.conversation_id = conversation
