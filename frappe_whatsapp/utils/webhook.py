@@ -120,7 +120,8 @@ def post():
                     "message": message_text,
                 }).insert(ignore_permissions=True)
 
-            elif message_type == 'contact':
+            # FIX: Changed 'contact' to 'contacts' (plural) to match the webhook payload
+            elif message_type == 'contacts':
                 contact_messages = []
                 for contact in message.get('contacts', []):
                     contact_name = contact.get('name', {}).get('formatted_name', 'Unknown Name')
@@ -137,10 +138,10 @@ def post():
                 }).insert(ignore_permissions=True)
 
             elif message_type == 'interactive':
-                interactive_data = message.get('interactive', {})
+                interactive_data = message['interactive']
                 message_text = "Interactive message received"
                 if 'button_reply' in interactive_data:
-                    message_text = interactive_data['button_reply'].get('title', message_text)
+                    message_text = interactive_data['button_reply']['title']
                 elif 'list_reply' in interactive_data:
                     message_text = interactive_data['list_reply'].get('title', message_text)
                 elif 'nfm_reply' in interactive_data:
@@ -207,8 +208,9 @@ def post():
                     "message": button_text,
                 }).insert(ignore_permissions=True)
 
-            else:  # Fallback for unsupported/system types
-                message_content = message.get(message_type, {}).get('body', f"Unhandled type: {message_type}")
+            # FIX: Simplified fallback to prevent AttributeError on list types (like 'contacts')
+            else:
+                message_content = f"Unhandled message type received: {message_type}"
                 frappe.get_doc({
                     **common_fields,
                     "message_id": message_id,
