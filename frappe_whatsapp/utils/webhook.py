@@ -3,7 +3,6 @@ import frappe
 import json
 import requests
 import time
-from datetime import datetime
 from werkzeug.wrappers import Response
 import frappe.utils
 
@@ -234,11 +233,8 @@ def post():
 
     else:
         # 4. Status Update Handling (Only executes if `messages` list is empty)
-
-        # We need to correctly extract the `changes` structure for the update_status function.
         changes = data.get("entry", [{}])[0].get("changes", [{}])[0]
 
-        # Only call update_status if changes dict is non-empty (i.e., we successfully extracted data)
         if changes:
             update_status(changes)
     return
@@ -266,17 +262,6 @@ def update_template_status(data):
         data
     )
 
-def convert_timestamp_to_frappe_dt(timestamp):
-	# 1. Convert to Python datetime object
-	python_datetime_object = datetime.datetime.fromtimestamp(timestamp)
-
-	# 2. Format into Frappe-compatible datetime string
-	frappe_formatted_string = python_datetime_object.strftime("%Y-%m-%d %H:%M:%S")
-
-	# 3. (Optional) Convert to Frappe's internal datetime object
-	# This requires a Frappe context to import and use frappe.utils
-	frappe_datetime_obj = frappe.utils.get_datetime(frappe_formatted_string)
-	return frappe_datetime_obj
 
 def update_message_status(data):
     """Update message status."""
@@ -288,10 +273,22 @@ def update_message_status(data):
     id = status_info['id']
     status = status_info['status']
     conversation = status_info.get('conversation', {}).get('id')
-    timestamp = status_info.get('timestamp')
-    name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
-    dt = convert_timestamp_to_frappe_dt(timestamp)
+    # FIX: Retrieve timestamp and convert from milliseconds (WhatsApp default) to seconds
+    timestamp_ms = status_info.get('timestamp')
+    if not timestamp_ms:
+        return  # Cannot update status without a timestamp
+
+    try:
+        # Convert millisecond timestamp (string) to seconds (float)
+        timestamp_s = int(timestamp_ms) / 1000
+        dt = frappe.utils.get_datetime(timestamp_s)
+    except ValueError as e:
+        frappe.error_log(f"Error converting timestamp to datetime: {e}")
+        # Handle case where timestamp is not a valid integer string
+        return
+
+    name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
     if name:
         doc = frappe.get_doc("WhatsApp Message", name)
@@ -299,9 +296,10 @@ def update_message_status(data):
 
         # Update timestamp fields based on status
         if status == 'delivered':
-            # Note: WhatsApp uses 'delivered' for received by the user's phone.
+            # This is where the message was delivered to the recipient's phone.
             doc.delivered_at = dt
         elif status == 'read':
+            # This is where the recipient read the message.
             doc.read_at = dt
 
         if conversation:
