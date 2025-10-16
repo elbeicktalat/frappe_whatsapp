@@ -171,9 +171,11 @@ def handle_incoming_message(message, whatsapp_account, sender_profile_name):
 
     elif message_type == 'location':
         location_data = message['location']
+        frappe.error_log(json.dumps(location_data))
+
         frappe.get_doc({
             **common_fields,
-            "message": json.dump(location_data),
+            "message": json.dumps(location_data),
             "content_type": message_type,
         }).insert(ignore_permissions=True)
 
