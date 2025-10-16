@@ -274,7 +274,7 @@ def update_message_status(data):
     status = status_info['status']
     conversation = status_info.get('conversation', {}).get('id')
 
-    # FIX: Retrieve timestamp and convert from milliseconds (WhatsApp default) to seconds
+    # FIX: Retrieve timestamp and convert from milliseconds (WhatsApp default) to seconds (float)
     timestamp_ms = status_info.get('timestamp')
     if not timestamp_ms:
         return  # Cannot update status without a timestamp
@@ -283,9 +283,8 @@ def update_message_status(data):
         # Convert millisecond timestamp (string) to seconds (float)
         timestamp_s = int(timestamp_ms) / 1000
         dt = frappe.utils.get_datetime(timestamp_s)
-    except ValueError as e:
-        frappe.error_log(f"Error converting timestamp to datetime: {e}")
-        # Handle case where timestamp is not a valid integer string
+    except (ValueError, TypeError):
+        # Handle cases where timestamp is not a valid integer string or casting fails
         return
 
     name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
@@ -297,6 +296,8 @@ def update_message_status(data):
         # Update timestamp fields based on status
         if status == 'delivered':
             # This is where the message was delivered to the recipient's phone.
+            # Assuming DocType field is 'delivered_at' or 'received_at'
+            # Using delivered_at based on Meta's terminology
             doc.delivered_at = dt
         elif status == 'read':
             # This is where the recipient read the message.
