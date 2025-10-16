@@ -49,9 +49,10 @@ def post():
 
     # 2. Data Extraction
 
-    # Path 1: Extract messages and phone_id
-    messages = data["entry"][0]["changes"][0]["value"].get("messages", [])
-    phone_id = data["entry"][0]["changes"][0]["value"].get("metadata", {}).get("phone_number_id")
+    # Attempt to extract messages and phone_id from the standard structure
+    value = data.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {})
+    messages = value.get("messages", [])
+    phone_id = value.get("metadata", {}).get("phone_number_id")
 
     sender_profile_name = next(
         (
@@ -62,11 +63,6 @@ def post():
         ),
         None,
     )
-
-    # Attempt to extract phone_id again if it was missed in the first pass
-    if not phone_id:
-        phone_id = data.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {}).get("metadata", {}).get(
-            "phone_number_id")
 
     whatsapp_account = get_whatsapp_account(phone_id) if phone_id else None
     if not whatsapp_account:
@@ -113,14 +109,31 @@ def post():
                 }).insert(ignore_permissions=True)
 
             elif message_type == 'location':
-                location_data = message.get('location')
-                message_text = f"{json.dumps(location_data)}"
+                location_data = message.get('location', {})
+                latitude = location_data.get('latitude')
+                longitude = location_data.get('longitude')
+                name = location_data.get('name')
+                address = location_data.get('address')
+
+                if latitude and longitude:
+                    message_text = json.dumps({
+                        "latitude": latitude,
+                        "longitude": longitude,
+                    })
+                else:
+                    message_text = "Location received, but coordinates are missing."
+
+                if name:
+                    message_text += f"\nName: {name}"
+                if address:
+                    message_text += f"\nAddress: {address}"
+
                 frappe.get_doc({
                     **common_fields,
                     "message": message_text,
                 }).insert(ignore_permissions=True)
 
-            # FIX: Changed 'contact' to 'contacts' (plural) to match the webhook payload
+            # Handles 'contacts' type (plural)
             elif message_type == 'contacts':
                 contact_messages = []
                 for contact in message.get('contacts', []):
@@ -138,10 +151,10 @@ def post():
                 }).insert(ignore_permissions=True)
 
             elif message_type == 'interactive':
-                interactive_data = message['interactive']
+                interactive_data = message.get('interactive', {})
                 message_text = "Interactive message received"
                 if 'button_reply' in interactive_data:
-                    message_text = interactive_data['button_reply']['title']
+                    message_text = interactive_data['button_reply'].get('title', message_text)
                 elif 'list_reply' in interactive_data:
                     message_text = interactive_data['list_reply'].get('title', message_text)
                 elif 'nfm_reply' in interactive_data:
@@ -208,7 +221,7 @@ def post():
                     "message": button_text,
                 }).insert(ignore_permissions=True)
 
-            # FIX: Simplified fallback to prevent AttributeError on list types (like 'contacts')
+            # Fallback for unhandled types
             else:
                 message_content = f"Unhandled message type received: {message_type}"
                 frappe.get_doc({
@@ -219,9 +232,14 @@ def post():
 
 
     else:
-        # 4. Status Update Handling
-        changes = data["entry"][0]["changes"][0]
-        update_status(changes)
+        # 4. Status Update Handling (Only executes if `messages` list is empty)
+
+        # We need to correctly extract the `changes` structure for the update_status function.
+        changes = data.get("entry", [{}])[0].get("changes", [{}])[0]
+
+        # Only call update_status if changes dict is non-empty (i.e., we successfully extracted data)
+        if changes:
+            update_status(changes)
     return
 
 
@@ -250,9 +268,14 @@ def update_template_status(data):
 
 def update_message_status(data):
     """Update message status."""
-    id = data['statuses'][0]['id']
-    status = data['statuses'][0]['status']
-    conversation = data['statuses'][0].get('conversation', {}).get('id')
+    # Ensure there is a 'statuses' key and it is not empty before accessing index [0]
+    if not data or not data.get('statuses'):
+        return
+
+    status_info = data['statuses'][0]
+    id = status_info['id']
+    status = status_info['status']
+    conversation = status_info.get('conversation', {}).get('id')
     name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
     if name:
