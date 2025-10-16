@@ -171,11 +171,26 @@ def handle_incoming_message(message, whatsapp_account, sender_profile_name):
 
     elif message_type == 'location':
         location_data = message['location']
-        frappe.error_log(json.dumps(location_data))
+
+        # --- FIX 2: Handle optional location fields robustly ---
+        latitude = location_data.get('latitude')
+        longitude = location_data.get('longitude')
+        name = location_data.get('name')  # Can be missing if user shares current location
+        address = location_data.get('address')  # Can be missing if user shares current location
+
+        # Start with coordinates, which are usually present
+        message_text = f"Lat: {latitude}, Lon: {longitude}"
+
+        # Append name and address if they exist
+        if name:
+            message_text += f", Name: {name}"
+        if address:
+            message_text += f", Address: {address}"
+        # ----------------------------------------------------
 
         frappe.get_doc({
             **common_fields,
-            "message": json.dumps(location_data),
+            "message": message_text,
             "content_type": message_type,
         }).insert(ignore_permissions=True)
 
