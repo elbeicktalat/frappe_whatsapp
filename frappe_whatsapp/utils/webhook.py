@@ -277,9 +277,15 @@ def update_message_status(data):
     status = status_info['status']
     conversation = status_info.get('conversation', {}).get('id')
 
-    # Extract timestamp (UNIX) and convert to Frappe datetime
-    timestamp_unix = int(status_info.get('timestamp'))
-    timestamp_dt = frappe.utils.get_datetime(timestamp_unix)
+    # FIX: Convert the timestamp (which is in milliseconds) to seconds for Frappe's utility
+    timestamp_unix_ms = status_info.get('timestamp')
+
+    if timestamp_unix_ms:
+        # Convert to integer and divide by 1000
+        timestamp_unix_s = int(timestamp_unix_ms) / 1000
+        timestamp_dt = frappe.utils.get_datetime(timestamp_unix_s)
+    else:
+        return  # Cannot update status without a timestamp
 
     name = frappe.db.get_value("WhatsApp Message", filters={"message_id": id})
 
