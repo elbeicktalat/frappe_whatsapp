@@ -191,7 +191,7 @@ def send_message(to, message, content_type, account, reference_doctype, referenc
             "reference_doctype": reference_doctype,
             "reference_name": reference_name,
             "content_type": content_type,
-            "whatsApp_account": account,
+            "whatsapp_account": account,
         })
 
         doc.save()
