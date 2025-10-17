@@ -66,6 +66,10 @@ class WhatsAppMessage(Document):
                     if 'to' not in data:
                         data['to'] = format_number(self.to)
 
+                    # Add reply context if document fields are set, but only if not already in JSON
+                    if self.is_reply and self.reply_to_message_id and "context" not in data:
+                        data["context"] = {"message_id": self.reply_to_message_id}
+
                     # The message 'type' (e.g., 'text', 'interactive', 'location') should be defined in template_json
 
                 # Standard Text/Media Message Construction
@@ -116,6 +120,11 @@ class WhatsAppMessage(Document):
             "messaging_product": "whatsapp",
             "to": format_number(self.to),
         }
+
+        # --- FIX: Add reply context for template messages ---
+        if self.is_reply and self.reply_to_message_id:
+            data["context"] = {"message_id": self.reply_to_message_id}
+        # --------------------------------------------------
 
         # Case 1: Template name provided (uses existing WhatsApp Templates doctype)
         if self.template:
@@ -189,8 +198,6 @@ class WhatsAppMessage(Document):
             # If the JSON is for a simple message type (text, location),
             # we change the type to "Manual" so it gets handled in before_insert
             # and avoids being sent twice or improperly structured.
-            # NOTE: This is mainly a fallback. Ideally, 'interactive' and 'template'
-            # should be sent from here. 'text' and 'media' are best handled by 'Manual'.
             if data.get("type") in ["text", "location", "contacts"]:
                 self.message_type = "Manual"
                 self.content_type = data.get("type")
