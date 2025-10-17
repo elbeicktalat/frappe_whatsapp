@@ -104,7 +104,7 @@ class WhatsAppMessage(Document):
                 for field_name in field_names:
                     value = custom_values.get(field_name.strip())
                     parameters.append({"type": "text", "text": value})
-                    template_parameters.append(value)                    
+                    template_parameters.append(value)
 
             else:
                 ref_doc = frappe.get_doc(self.reference_doctype, self.reference_name)
@@ -113,7 +113,6 @@ class WhatsAppMessage(Document):
 
                     parameters.append({"type": "text", "text": value})
                     template_parameters.append(value)
-
 
             self.template_parameters = json.dumps(template_parameters)
 
@@ -175,8 +174,28 @@ class WhatsAppMessage(Document):
 
             frappe.throw(msg=error_message, title=res.get("error_user_title", "Error"))
 
+
 def on_doctype_update():
     frappe.db.add_index("WhatsApp Message", ["reference_doctype", "reference_name"])
+
+
+@frappe.whitelist()
+def send_message(to, message, content_type, reference_doctype, reference_name):
+    try:
+        doc = frappe.get_doc({
+            "doctype": "WhatsApp Message",
+            "to": to,
+            "message": message,
+            "type": "Outgoing",
+            "message_type": "Manual",
+            "reference_doctype": reference_doctype,
+            "reference_name": reference_name,
+            "content_type": content_type,
+        })
+
+        doc.save()
+    except Exception as e:
+        raise e
 
 
 @frappe.whitelist()
