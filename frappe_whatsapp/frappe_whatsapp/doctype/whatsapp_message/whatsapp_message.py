@@ -20,10 +20,10 @@ class WhatsAppMessage(Document):
         from_number = format_number(number)
 
         if (
-            self.has_value_changed("profile_name")
-            and self.profile_name
-            and from_number
-            and frappe.db.exists("WhatsApp Profiles", {"number": from_number})
+                self.has_value_changed("profile_name")
+                and self.profile_name
+                and from_number
+                and frappe.db.exists("WhatsApp Profiles", {"number": from_number})
         ):
             profile_id = frappe.get_value("WhatsApp Profiles", {"number": from_number}, "name")
             frappe.db.set_value("WhatsApp Profiles", profile_id, "profile_name", self.profile_name)
@@ -39,6 +39,7 @@ class WhatsAppMessage(Document):
             }).insert(ignore_permissions=True)
 
     """Send whats app messages."""
+
     def before_insert(self):
         """Send message."""
 
@@ -276,7 +277,8 @@ def send_message(to, message, content_type, account, reference_doctype=None, ref
 
 
 @frappe.whitelist()
-def send_template(to, account, reference_doctype=None, reference_name=None, template=None, template_json=None):
+def send_template(to, account, reference_doctype=None, reference_name=None, template=None, template_json=None,
+                  is_reply=None, reply_to_message_id=None):
     """
     Sends a template message (Doctype) or a custom message (via template_json).
     The template_json is used for all complex message types (interactive, location, contacts).
@@ -300,6 +302,8 @@ def send_template(to, account, reference_doctype=None, reference_name=None, temp
             "whatsapp_account": account,
             "template": template,
             "template_json": template_json,
+            "is_reply": is_reply,
+            "reply_to_message_id": reply_to_message_id,
         }
 
         doc = frappe.get_doc(message_doc)
