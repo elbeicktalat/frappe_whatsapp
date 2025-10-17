@@ -180,7 +180,7 @@ def on_doctype_update():
 
 
 @frappe.whitelist()
-def send_message(to, message, content_type, reference_doctype, reference_name):
+def send_message(to, message, content_type, account, reference_doctype, reference_name):
     try:
         doc = frappe.get_doc({
             "doctype": "WhatsApp Message",
@@ -191,6 +191,7 @@ def send_message(to, message, content_type, reference_doctype, reference_name):
             "reference_doctype": reference_doctype,
             "reference_name": reference_name,
             "content_type": content_type,
+            "whatsApp_account": account,
         })
 
         doc.save()
