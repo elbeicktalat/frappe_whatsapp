@@ -2,6 +2,7 @@
 
 import json
 import frappe
+import uuid
 
 from frappe import _dict, _
 from frappe.model.document import Document
@@ -144,6 +145,9 @@ class WhatsAppNotification(Document):
                     "parameters": parameters
                 }]
 
+            # generate uuid for message verify validity.
+            my_uuid = uuid.uuid4()
+
             if self.attach_document_print:
                 # frappe.db.begin()
                 key = doc.get_document_share_key()  # noqa
@@ -170,7 +174,7 @@ class WhatsAppNotification(Document):
                 )
 
                 filename = f'{doc_data["name"]}.pdf'
-                url = f'{frappe.utils.get_url()}{link}&key={key}'
+                url = f'{frappe.utils.get_url()}{link}&key={key}&uuid={my_uuid}'
 
             elif self.custom_attachment:
                 filename = self.file_name
@@ -180,7 +184,7 @@ class WhatsAppNotification(Document):
                     if not file_url.startswith("http"):
                         # get share key so that private files can be sent
                         key = doc.get_document_share_key()
-                        file_url = f'{frappe.utils.get_url()}{file_url}&key={key}'
+                        file_url = f'{frappe.utils.get_url()}{file_url}&key={key}&uuid={my_uuid}'
                 else:
                     file_url = self.attach
 
