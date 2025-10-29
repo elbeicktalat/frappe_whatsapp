@@ -82,8 +82,9 @@ class WhatsAppNotification(Document):
                     "components": []
                 }
             }
+            my_uuid = uuid.uuid4()
             self.content_type = template.get("header_type", "text").lower()
-            self.notify(data, template.whatsapp_account)
+            self.notify(data, template.whatsapp_account, my_uuid)
 
 
     def send_template_message(self, doc: Document, phone_no=None, default_template=None, ignore_condition=False):
@@ -216,9 +217,9 @@ class WhatsAppNotification(Document):
                 })
             self.content_type = template.header_type.lower()
 
-            self.notify(data, template.whatsapp_account, doc_data)
+            self.notify(data, template.whatsapp_account, my_uuid, doc_data)
 
-    def notify(self, data, whatsapp_account: str, doc_data=None):
+    def notify(self, data, whatsapp_account: str, my_uuid, doc_data=None):
         """Notify."""
         settings = frappe.get_doc(
             "WhatsApp Settings", "WhatsApp Settings",
@@ -248,6 +249,7 @@ class WhatsAppNotification(Document):
                 "message_id": response['messages'][0]['id'],
                 "content_type": self.content_type,
                 "whatsapp_account": whatsapp_account,
+                'uuid': my_uuid,
             }
 
             if doc_data:

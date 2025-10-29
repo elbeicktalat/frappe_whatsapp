@@ -31,7 +31,8 @@
   "reference_doctype",
   "bulk_message_reference",
   "column_break_efrb",
-  "reference_name"
+  "reference_name",
+   "uuid"
  ],
  "fields": [
   {
@@ -196,6 +197,12 @@
    "fieldtype": "Link",
    "label": "WhatsApp Account",
    "options": "WhatsApp Account"
+  },
+  {
+  "fieldname": "uuid",
+  "fieldtype": "Data",
+  "label": "UUID",
+  "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
