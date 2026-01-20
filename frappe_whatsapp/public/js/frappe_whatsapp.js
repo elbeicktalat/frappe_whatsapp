@@ -15,6 +15,7 @@ $(document).on('app_ready', function () {
 							'fields': [
 								{ 'fieldname': 'ht', 'fieldtype': 'HTML' },
 								{ 'label': 'Select Template', 'fieldname': 'template', 'reqd': 1, 'fieldtype': 'Link', 'options': 'WhatsApp Templates' },
+								{ 'label': 'Select Account', 'fieldname': 'account', 'reqd': 1, 'fieldtype': 'Link', 'options': 'WhatsApp Account' },
 								{ 'label': 'Send to', 'fieldname': 'contact', 'reqd': 1, 'fieldtype': 'Link', 'options': 'Contact', change() {
 					                let contact_name = dialog.get_value('contact');
 					                console.log("heheheh", contact_name)
@@ -44,7 +45,7 @@ $(document).on('app_ready', function () {
 
 							],
 							'primary_action_label': 'Send',
-							'title': 'Send a Telegram Message',
+							'title': 'Send a WhatsApp Message',
 							primary_action: function () {
 								var values = dialog.get_values();
 								if (values) {
@@ -56,6 +57,7 @@ $(document).on('app_ready', function () {
 										method: "frappe_whatsapp.frappe_whatsapp.doctype.whatsapp_message.whatsapp_message.send_template",
 										args: {
 											to: values.mobile_no,
+											account: values.account,
 											template: values.template,
 											reference_doctype: frm.doc.doctype,
 											reference_name: frm.doc.name
